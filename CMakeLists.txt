@@ -1,7 +1,19 @@
 cmake_minimum_required(VERSION 3.2)
-project(hunky-dory LANGUAGES CXX VERSION 0.1)
+project(hunky-dory LANGUAGES CXX VERSION 0.1.0)
 
-add_executable(hunky-dory main.cpp)
+set(CMAKE_CXX_STANDARD 11)
+
+configure_file(hunky_dory.hpp.in ${PROJECT_BINARY_DIR}/hunky_dory.hpp)
+
+add_executable(hunky-dory
+    main.cpp
+    vendor/docopt.cpp/docopt.cpp
+    )
+target_include_directories(hunky-dory
+    PRIVATE
+    ${PROJECT_BINARY_DIR}
+    vendor/docopt.cpp
+    )
 install(TARGETS hunky-dory
     RUNTIME DESTINATION bin
     )
