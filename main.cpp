@@ -1,6 +1,9 @@
 #include <iostream>
 
+#include <cpd/rigid.hpp>
 #include <pdal/ChipperFilter.hpp>
+#include <pdal/CropFilter.hpp>
+#include <pdal/PointViewIter.hpp>
 #include <pdal/StageFactory.hpp>
 
 #include "docopt.h"
@@ -29,6 +32,7 @@ Options:
 
 pdal::Stage* infer_and_create_reader(pdal::StageFactory& factory,
                                      const std::string& path);
+cpd::Matrix point_view_to_matrix(const pdal::PointViewPtr view);
 
 int main(int argc, char** argv) {
     std::map<std::string, docopt::value> args = docopt::docopt(
@@ -50,16 +54,37 @@ int main(int argc, char** argv) {
 
         pdal::Options chipper_options;
         chipper_options.add("capacity", capacity, "");
-
         pdal::ChipperFilter chipper;
         chipper.setInput(*source_reader);
         chipper.setOptions(chipper_options);
 
-        pdal::PointTable table;
-        chipper.prepare(table);
+        pdal::PointTable source_table;
+        chipper.prepare(source_table);
+        pdal::PointViewSet viewset = chipper.execute(source_table);
 
-        pdal::PointViewSet viewset = chipper.execute(table);
+        for (auto it = viewset.begin(); it != viewset.end(); ++it) {
+            pdal::PointViewPtr source_view = *it;
+            cpd::Matrix source = point_view_to_matrix(source_view);
+            pdal::BOX2D bounds;
+            source_view->calculateBounds(bounds);
+            pdal::Options crop_options;
+            crop_options.add("bounds", bounds);
+            pdal::CropFilter crop;
+            crop.setInput(*target_reader);
+            crop.setOptions(crop_options);
 
+            pdal::PointTable target_table;
+            crop.prepare(target_table);
+            pdal::PointViewSet target_viewset = crop.execute(target_table);
+            assert(target_viewset.size() == 1);
+            pdal::PointViewPtr target_view = *target_viewset.begin();
+            cpd::Matrix target = point_view_to_matrix(target_view);
+
+            cpd::RigidResult result = cpd::rigid(source, target);
+            std::cout << "CPD rigid translation: \n"
+                      << result.translation << "\n";
+            break;
+        }
     } else {
         std::cout << "Using entwine indices\n";
         std::cout << "ERROR: not supported yet...\n";
@@ -87,4 +112,14 @@ pdal::Stage* infer_and_create_reader(pdal::StageFactory& factory,
     pdal::Stage* reader = factory.createStage(driver);
     reader->setOptions(options);
     return reader;
+}
+
+cpd::Matrix point_view_to_matrix(const pdal::PointViewPtr view) {
+    cpd::Matrix matrix(view->size(), 3);
+    for (pdal::point_count_t i = 0; i < view->size(); ++i) {
+        matrix(i, 0) = view->getFieldAs<double>(pdal::Dimension::Id::X, i);
+        matrix(i, 1) = view->getFieldAs<double>(pdal::Dimension::Id::Y, i);
+        matrix(i, 2) = view->getFieldAs<double>(pdal::Dimension::Id::Z, i);
+    }
+    return matrix;
 }

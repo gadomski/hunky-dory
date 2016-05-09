@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 11)
 
 configure_file(hunky_dory.hpp.in ${PROJECT_BINARY_DIR}/hunky_dory.hpp)
 
+find_package(Cpd REQUIRED)
 find_package(PDAL REQUIRED)
 
 add_executable(hunky-dory
@@ -19,6 +20,7 @@ target_include_directories(hunky-dory
     )
 target_link_libraries(hunky-dory
     PRIVATE
+    Cpd::Library-C++
     pdalcpp
     )
 install(TARGETS hunky-dory
