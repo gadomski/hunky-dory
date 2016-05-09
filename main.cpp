@@ -82,7 +82,7 @@ int main(int argc, char** argv) {
             pdal::PointViewPtr target_view = *target_viewset.begin();
             cpd::Matrix target = point_view_to_matrix(target_view);
 
-            cpd::RigidResult result = cpd::rigid(source, target);
+            cpd::RigidResult result = cpd::rigid(source, target, sigma2);
             std::cout << "CPD rigid translation: \n"
                       << result.translation << "\n";
             break;
