@@ -19,7 +19,7 @@ static const char USAGE[] =
         - David Bowie, "Changes"
 
 Usage:
-    hunky-dory cpd <source> <target> [--capacity=n] [--no-entwine]
+    hunky-dory cpd <source> <target> [--capacity=n] [--sigma2=n] [--no-entwine]
     hunky-dory (-h | --help)
     hunky-dory --version
 
@@ -27,6 +27,7 @@ Options:
     -h --help       Show this screen.
     --version       Show version.
     --capacity=n    Approximate capacity of each tile/chip/segment. [default: 20000]
+    --sigma2=n      Starting bandwidth for CPD alignment calculations. [default: 5.0]
     --no-entwine    Don't use entwine's index — use PDAL's chipper instead.
 )";
 
@@ -41,6 +42,7 @@ int main(int argc, char** argv) {
     std::string source_path = args.at("<source>").asString();
     std::string target_path = args.at("<target>").asString();
     long capacity = args.at("--capacity").asLong();
+    double sigma2 = std::stod(args.at("--sigma2").asString());
 
     if (args["--no-entwine"]) {
         std::cout << "Using PDAL's chipper\n";
