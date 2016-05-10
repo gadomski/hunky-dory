@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include <cpd/rigid.hpp>
+#include <entwine/tree/builder.hpp>
 #include <pdal/ChipperFilter.hpp>
 #include <pdal/CropFilter.hpp>
 #include <pdal/PointViewIter.hpp>
@@ -89,8 +90,18 @@ int main(int argc, char** argv) {
         }
     } else {
         std::cout << "Using entwine indices\n";
-        std::cout << "ERROR: not supported yet...\n";
-        return 1;
+        entwine::Builder builder(source_path);
+        entwine::Schema xyz({entwine::DimInfo("X", "floating", 8),
+                             entwine::DimInfo("Y", "floating", 8),
+                             entwine::DimInfo("Z", "floating", 8)});
+        auto handler([&](pdal::PointView& view, entwine::BBox bbox) {
+            for (size_t p(0); p < view.size(); ++p) {
+                std::cout << "here\n";
+                break;
+            }
+        });
+
+        builder.traverse(1, 100 * 100, handler, &xyz);
     }
     return 0;
 }
