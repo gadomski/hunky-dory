@@ -45,7 +45,7 @@ int main(int argc, char** argv) {
     long capacity = args.at("--capacity").asLong();
     double sigma2 = std::stod(args.at("--sigma2").asString());
 
-    if (args["--no-entwine"]) {
+    if (args.at("--no-entwine").asBool()) {
         std::cout << "Using PDAL's chipper\n";
 
         pdal::StageFactory factory(false);
@@ -95,10 +95,8 @@ int main(int argc, char** argv) {
                              entwine::DimInfo("Y", "floating", 8),
                              entwine::DimInfo("Z", "floating", 8)});
         auto handler([&](pdal::PointView& view, entwine::BBox bbox) {
-            for (size_t p(0); p < view.size(); ++p) {
-                std::cout << "here\n";
-                break;
-            }
+            std::cout << "Number of points: " << view.size() << "\n";
+            return true;
         });
 
         builder.traverse(1, 100 * 100, handler, &xyz);
