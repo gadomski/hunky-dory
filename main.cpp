@@ -63,13 +63,18 @@ int main(int argc, char** argv) {
 
         pdal::PointTable source_table;
         chipper.prepare(source_table);
+
+        std::cout << "Chipping..." << std::flush;
         pdal::PointViewSet viewset = chipper.execute(source_table);
+        std::cout << "done\n";
 
         for (auto it = viewset.begin(); it != viewset.end(); ++it) {
             pdal::PointViewPtr source_view = *it;
             cpd::Matrix source = point_view_to_matrix(source_view);
             pdal::BOX2D bounds;
             source_view->calculateBounds(bounds);
+            std::cout << "Iteration with source bounds: " << bounds << "\n";
+
             pdal::Options crop_options;
             crop_options.add("bounds", bounds);
             pdal::CropFilter crop;
@@ -78,12 +83,18 @@ int main(int argc, char** argv) {
 
             pdal::PointTable target_table;
             crop.prepare(target_table);
+
+            std::cout << "Cropping target data..." << std::flush;
             pdal::PointViewSet target_viewset = crop.execute(target_table);
+            std::cout << "done\n";
+
             assert(target_viewset.size() == 1);
             pdal::PointViewPtr target_view = *target_viewset.begin();
             cpd::Matrix target = point_view_to_matrix(target_view);
 
-            cpd::RigidResult result = cpd::rigid(source, target, sigma2);
+            cpd::Rigid registration = cpd::Rigid();
+            registration.use_fgt(false);
+            cpd::RigidResult result = registration.compute(source, target, sigma2);
             std::cout << "CPD rigid translation: \n"
                       << result.translation << "\n";
             break;
