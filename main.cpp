@@ -20,7 +20,7 @@ static const char USAGE[] =
         - David Bowie, "Changes"
 
 Usage:
-    hunky-dory cpd <source> <target> [--capacity=n] [--sigma2=n] [--no-entwine]
+    hunky-dory cpd <source> <target> <outfile> [--capacity=n] [--sigma2=n] [--no-entwine]
     hunky-dory (-h | --help)
     hunky-dory --version
 
@@ -32,9 +32,11 @@ Options:
     --no-entwine    Don't use entwine's index — use PDAL's chipper instead.
 )";
 
+typedef fgt::Matrix Matrix;
+
 pdal::Stage* infer_and_create_reader(pdal::StageFactory& factory,
                                      const std::string& path);
-cpd::Matrix point_view_to_matrix(const pdal::PointViewPtr view);
+Matrix point_view_to_matrix(const pdal::PointViewPtr view);
 
 int main(int argc, char** argv) {
     std::map<std::string, docopt::value> args = docopt::docopt(
@@ -44,6 +46,9 @@ int main(int argc, char** argv) {
     std::string target_path = args.at("<target>").asString();
     long capacity = args.at("--capacity").asLong();
     double sigma2 = std::stod(args.at("--sigma2").asString());
+    std::ofstream outfile(args.at("<outfile>").asString());
+    outfile.precision(2);
+    outfile << std::fixed;
 
     if (args.at("--no-entwine").asBool()) {
         std::cout << "Using PDAL's chipper\n";
@@ -66,14 +71,17 @@ int main(int argc, char** argv) {
 
         std::cout << "Chipping..." << std::flush;
         pdal::PointViewSet viewset = chipper.execute(source_table);
-        std::cout << "done\n";
+        std::cout << "done, with " << viewset.size() << " chips\n";
+        size_t nchips = viewset.size();
+        std::vector<std::shared_ptr<pdal::PointView>> viewvec(viewset.begin(),
+                                                              viewset.end());
 
-        for (auto it = viewset.begin(); it != viewset.end(); ++it) {
-            pdal::PointViewPtr source_view = *it;
-            cpd::Matrix source = point_view_to_matrix(source_view);
+#pragma omp parallel for
+        for (size_t i = 0; i < nchips; ++i) {
+            pdal::PointViewPtr source_view = viewvec[i];
+            Matrix source = point_view_to_matrix(source_view);
             pdal::BOX2D bounds;
             source_view->calculateBounds(bounds);
-            std::cout << "Iteration with source bounds: " << bounds << "\n";
 
             pdal::Options crop_options;
             crop_options.add("bounds", bounds);
@@ -90,14 +98,24 @@ int main(int argc, char** argv) {
 
             assert(target_viewset.size() == 1);
             pdal::PointViewPtr target_view = *target_viewset.begin();
-            cpd::Matrix target = point_view_to_matrix(target_view);
+            Matrix target = point_view_to_matrix(target_view);
 
-            cpd::Rigid registration = cpd::Rigid();
-            registration.use_fgt(false);
-            cpd::RigidResult result = registration.compute(source, target, sigma2);
-            std::cout << "CPD rigid translation: \n"
-                      << result.translation << "\n";
-            break;
+            cpd::Options options;
+            options.set_sigma2(sigma2);
+            cpd::RigidResult<Matrix> result =
+                cpd::rigid(source, target, options);
+            fgt::Vector translation =
+                (target - result.moving).colwise().mean().transpose();
+            {
+                std::cout << "Runtime: " << result.runtime
+                          << "s\nAverage motion:\n"
+                          << translation << "\n";
+                outfile << bounds.minx << " " << bounds.maxx << " "
+                        << bounds.miny << " " << bounds.maxy << " "
+                        << translation(0) << " " << translation(1) << " "
+                        << translation(2) << "\n";
+                outfile << std::flush;
+            }
         }
     } else {
         std::cout << "Using entwine indices\n";
@@ -110,8 +128,9 @@ int main(int argc, char** argv) {
             return true;
         });
 
-        builder.traverse(1, 100 * 100, handler, &xyz);
+        builder.traverse(1, 100, handler, &xyz);
     }
+    outfile.close();
     return 0;
 }
 
@@ -136,8 +155,8 @@ pdal::Stage* infer_and_create_reader(pdal::StageFactory& factory,
     return reader;
 }
 
-cpd::Matrix point_view_to_matrix(const pdal::PointViewPtr view) {
-    cpd::Matrix matrix(view->size(), 3);
+Matrix point_view_to_matrix(const pdal::PointViewPtr view) {
+    Matrix matrix(view->size(), 3);
     for (pdal::point_count_t i = 0; i < view->size(); ++i) {
         matrix(i, 0) = view->getFieldAs<double>(pdal::Dimension::Id::X, i);
         matrix(i, 1) = view->getFieldAs<double>(pdal::Dimension::Id::Y, i);
