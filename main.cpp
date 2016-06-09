@@ -20,7 +20,8 @@ static const char USAGE[] =
         - David Bowie, "Changes"
 
 Usage:
-    hunky-dory cpd <source> <target> <outfile> [--capacity=n] [--sigma2=n] [--no-entwine]
+    hunky-dory cpd chip <source> <target> <outfile> [--capacity=n] [--sigma2=n] [--no-entwine]
+    hunky-dory cpd bounds <source> <target> <bounds> [--sigma2=n]
     hunky-dory (-h | --help)
     hunky-dory --version
 
@@ -33,22 +34,46 @@ Options:
 )";
 
 typedef fgt::Matrix Matrix;
+typedef std::map<std::string, docopt::value> DocoptMap;
 
-pdal::Stage* infer_and_create_reader(pdal::StageFactory& factory,
-                                     const std::string& path);
-Matrix point_view_to_matrix(const pdal::PointViewPtr view);
+pdal::Stage* infer_and_create_reader(pdal::StageFactory&, const std::string&);
+Matrix point_view_to_matrix(const pdal::PointViewPtr);
+Matrix cropped_file(const std::string&, const pdal::BOX2D&);
+int main_cpd(const DocoptMap&);
+int main_cpd_chip(const DocoptMap&);
+int main_cpd_bounds(const DocoptMap&);
 
 int main(int argc, char** argv) {
-    std::map<std::string, docopt::value> args = docopt::docopt(
-        USAGE, {argv + 1, argv + argc}, true, hunky_dory::VERSION);
+    DocoptMap args = docopt::docopt(USAGE, {argv + 1, argv + argc}, true,
+                                    hunky_dory::VERSION);
 
+    if (args.at("cpd").asBool()) {
+        return main_cpd(args);
+    } else {
+        std::cerr << "Unsupported registration method." << std::endl;
+        return 1;
+    }
+}
+
+int main_cpd(const DocoptMap& args) {
+    if (args.at("chip").asBool()) {
+        return main_cpd_chip(args);
+    } else if (args.at("bounds").asBool()) {
+        return main_cpd_bounds(args);
+    } else {
+        std::cerr << "Unsupported cpd method." << std::endl;
+        return 1;
+    }
+}
+
+int main_cpd_chip(const DocoptMap& args) {
     std::string source_path = args.at("<source>").asString();
     std::string target_path = args.at("<target>").asString();
-    long capacity = args.at("--capacity").asLong();
-    double sigma2 = std::stod(args.at("--sigma2").asString());
     std::ofstream outfile(args.at("<outfile>").asString());
     outfile.precision(2);
     outfile << std::fixed;
+    double sigma2 = std::stod(args.at("--sigma2").asString());
+    long capacity = args.at("--capacity").asLong();
 
     if (args.at("--no-entwine").asBool()) {
         std::cout << "Using PDAL's chipper\n";
@@ -129,6 +154,34 @@ int main(int argc, char** argv) {
     return 0;
 }
 
+int main_cpd_bounds(const DocoptMap& args) {
+    std::stringstream bounds_ss(args.at("<bounds>").asString());
+    pdal::BOX2D bounds;
+    bounds_ss >> bounds;
+    if (bounds.empty()) {
+        std::cerr << "Invalid bounds" << std::endl;
+        return 1;
+    }
+
+    std::cout << "Cropping source file..." << std::flush;
+    Matrix source = cropped_file(args.at("<source>").asString(), bounds);
+    std::cout << "done with " << source.rows()
+              << " points.\nCropping target file..." << std::flush;
+    Matrix target = cropped_file(args.at("<target>").asString(), bounds);
+    std::cout << "done with " << target.rows() << " points.\n";
+    double sigma2 = std::stod(args.at("--sigma2").asString());
+
+    cpd::Options options;
+    options.set_sigma2(sigma2);
+    cpd::RigidResult<Matrix> result = cpd::rigid(source, target, options);
+
+    fgt::Vector translation = (target - result.moving).colwise().mean();
+    std::cout << "Runtime: " << result.runtime
+              << "s\nMotion:" << translation.transpose() << "\n";
+
+    return 0;
+}
+
 std::string infer_reader_driver(const pdal::StageFactory& factory,
                                 const std::string& path) {
     std::string driver = factory.inferReaderDriver(path);
@@ -158,4 +211,19 @@ Matrix point_view_to_matrix(const pdal::PointViewPtr view) {
         matrix(i, 2) = view->getFieldAs<double>(pdal::Dimension::Id::Z, i);
     }
     return matrix;
+}
+
+Matrix cropped_file(const std::string& filename, const pdal::BOX2D& bounds) {
+    pdal::StageFactory factory(false);
+    pdal::Stage* reader = infer_and_create_reader(factory, filename);
+    pdal::Options options;
+    options.add("bounds", bounds);
+    pdal::CropFilter crop;
+    crop.setInput(*reader);
+    crop.setOptions(options);
+    pdal::PointTable table;
+    crop.prepare(table);
+    pdal::PointViewSet viewset = crop.execute(table);
+    assert(viewset.size() == 1);
+    return point_view_to_matrix(*viewset.begin());
 }
