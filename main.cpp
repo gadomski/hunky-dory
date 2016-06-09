@@ -72,13 +72,8 @@ int main(int argc, char** argv) {
         std::cout << "Chipping..." << std::flush;
         pdal::PointViewSet viewset = chipper.execute(source_table);
         std::cout << "done, with " << viewset.size() << " chips\n";
-        size_t nchips = viewset.size();
-        std::vector<std::shared_ptr<pdal::PointView>> viewvec(viewset.begin(),
-                                                              viewset.end());
 
-#pragma omp parallel for
-        for (size_t i = 0; i < nchips; ++i) {
-            pdal::PointViewPtr source_view = viewvec[i];
+        for (auto source_view : viewset) {
             Matrix source = point_view_to_matrix(source_view);
             pdal::BOX2D bounds;
             source_view->calculateBounds(bounds);
