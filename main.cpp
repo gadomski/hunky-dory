@@ -163,21 +163,32 @@ int main_cpd_bounds(const DocoptMap& args) {
         return 1;
     }
 
-    std::cout << "Cropping source file..." << std::flush;
+    std::cerr << "Cropping source file..." << std::flush;
     Matrix source = cropped_file(args.at("<source>").asString(), bounds);
-    std::cout << "done with " << source.rows()
+    std::cerr << "done with " << source.rows()
               << " points.\nCropping target file..." << std::flush;
     Matrix target = cropped_file(args.at("<target>").asString(), bounds);
-    std::cout << "done with " << target.rows() << " points.\n";
+    std::cerr << "done with " << target.rows() << " points.\n";
     double sigma2 = std::stod(args.at("--sigma2").asString());
 
-    cpd::Options options;
+    cpd::Options options(std::cerr);
     options.set_sigma2(sigma2);
     cpd::RigidResult<Matrix> result = cpd::rigid(source, target, options);
 
     fgt::Vector translation = (target - result.moving).colwise().mean();
-    std::cout << "Runtime: " << result.runtime
+    std::cerr << "Runtime: " << result.runtime
               << "s\nMotion:" << translation.transpose() << "\n";
+
+    std::cout << std::fixed;
+    std::cout << "{\"runtime\": " << result.runtime
+              << ", \"num_source\": " << source.rows()
+              << ", \"num_target\": " << target.rows()
+              << ", \"iterations\": " << result.iterations
+              << ", \"minx\": " << bounds.minx << ", \"maxx\": " << bounds.maxx
+              << ", \"miny\": " << bounds.miny << ", \"maxy\": " << bounds.maxy
+              << ", \"dx\": " << translation(0)
+              << ", \"dy\": " << translation(1)
+              << ", \"dz\": " << translation(2) << "}\n";
 
     return 0;
 }
