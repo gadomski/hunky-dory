@@ -38,7 +38,11 @@ typedef std::map<std::string, docopt::value> DocoptMap;
 
 pdal::Stage* infer_and_create_reader(pdal::StageFactory&, const std::string&);
 Matrix point_view_to_matrix(const pdal::PointViewPtr);
-Matrix cropped_file(const std::string&, const pdal::BOX2D&);
+struct CroppedFile {
+    CroppedFile(const std::string&, const pdal::BOX2D&);
+    Matrix matrix;
+    double time;
+};
 int main_cpd(const DocoptMap&);
 int main_cpd_chip(const DocoptMap&);
 int main_cpd_bounds(const DocoptMap&);
@@ -164,10 +168,12 @@ int main_cpd_bounds(const DocoptMap& args) {
     }
 
     std::cerr << "Cropping source file..." << std::flush;
-    Matrix source = cropped_file(args.at("<source>").asString(), bounds);
+    CroppedFile source_file(args.at("<source>").asString(), bounds);
+    Matrix source = source_file.matrix;
     std::cerr << "done with " << source.rows()
               << " points.\nCropping target file..." << std::flush;
-    Matrix target = cropped_file(args.at("<target>").asString(), bounds);
+    CroppedFile target_file(args.at("<target>").asString(), bounds);
+    Matrix target = target_file.matrix;
     std::cerr << "done with " << target.rows() << " points.\n";
     double sigma2 = std::stod(args.at("--sigma2").asString());
 
@@ -182,7 +188,9 @@ int main_cpd_bounds(const DocoptMap& args) {
     std::cout << std::fixed;
     std::cout << "{\"runtime\": " << result.runtime
               << ", \"num_source\": " << source.rows()
+              << ", \"source_time\": " << source_file.time
               << ", \"num_target\": " << target.rows()
+              << ", \"target_time\": " << target_file.time
               << ", \"iterations\": " << result.iterations
               << ", \"minx\": " << bounds.minx << ", \"maxx\": " << bounds.maxx
               << ", \"miny\": " << bounds.miny << ", \"maxy\": " << bounds.maxy
@@ -224,7 +232,17 @@ Matrix point_view_to_matrix(const pdal::PointViewPtr view) {
     return matrix;
 }
 
-Matrix cropped_file(const std::string& filename, const pdal::BOX2D& bounds) {
+double point_view_average_time(const pdal::PointViewPtr view) {
+    double time = 0.0;
+    for (pdal::point_count_t i = 0; i < view->size(); ++i) {
+        time += view->getFieldAs<double>(pdal::Dimension::Id::GpsTime, i) /
+                double(view->size());
+    }
+    return time;
+}
+
+CroppedFile::CroppedFile(const std::string& filename,
+                         const pdal::BOX2D& bounds) {
     pdal::StageFactory factory(false);
     pdal::Stage* reader = infer_and_create_reader(factory, filename);
     pdal::Options options;
@@ -236,5 +254,6 @@ Matrix cropped_file(const std::string& filename, const pdal::BOX2D& bounds) {
     crop.prepare(table);
     pdal::PointViewSet viewset = crop.execute(table);
     assert(viewset.size() == 1);
-    return point_view_to_matrix(*viewset.begin());
+    matrix = point_view_to_matrix(*viewset.begin());
+    time = point_view_average_time(*viewset.begin());
 }
