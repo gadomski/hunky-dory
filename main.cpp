@@ -1,7 +1,6 @@
 #include <iostream>
 
-#include <pointmatcher/IO.h>
-#include <pointmatcher/PointMatcher.h>
+#include <pcl/registration/icp.h>
 #include <cpd/rigid.hpp>
 #include <entwine/tree/builder.hpp>
 #include <pdal/ChipperFilter.hpp>
@@ -24,7 +23,7 @@ static const char USAGE[] =
 Usage:
     hunky-dory cpd chip <source> <target> <outfile> [--capacity=n] [--sigma2=n] [--no-entwine]
     hunky-dory cpd bounds <source> <target> <bounds> [--sigma2=n]
-    hunky-dory icp bounds <source> <target> <bounds> <config>
+    hunky-dory icp bounds <source> <target> <bounds>
     hunky-dory (-h | --help)
     hunky-dory --version
 
@@ -41,6 +40,8 @@ typedef std::map<std::string, docopt::value> DocoptMap;
 
 pdal::Stage* infer_and_create_reader(pdal::StageFactory&, const std::string&);
 Matrix point_view_to_matrix(const pdal::PointViewPtr);
+pcl::PointCloud<pcl::PointXYZ>::Ptr eigen_to_pcl(const Matrix&);
+Matrix pcl_to_eigen(const pcl::PointCloud<pcl::PointXYZ>&);
 struct CroppedFile {
     CroppedFile(const std::string&, const pdal::BOX2D&);
     Matrix matrix;
@@ -229,18 +230,20 @@ BoundsResult cpd_bounds(const Matrix& source, const Matrix& target,
 
 BoundsResult icp_bounds(const Matrix& source, const Matrix& target,
                         const DocoptMap& args) {
-    PointMatcherIO<double>::LabelGenerator label_generator;
-    label_generator.add("x");
-    label_generator.add("y");
-    label_generator.add("z");
-    PointMatcher<double>::DataPoints s(source.transpose(), label_generator.getLabels());
-    PointMatcher<double>::DataPoints t(target.transpose(), label_generator.getLabels());
-    PointMatcher<double>::ICP icp;
-    std::ifstream config(args.at("<config>").asString());
-    icp.loadFromYaml(config);
-    config.close();
-    PointMatcher<double>::TransformationParameters transform = icp(t, s);
-    std::cerr << transform << std::endl;
+    pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
+    auto s = eigen_to_pcl(source);
+    auto t = eigen_to_pcl(target);
+    // yes source and target are backwards, deal with it
+    icp.setInputSource(t);
+    icp.setInputTarget(s);
+    pcl::PointCloud<pcl::PointXYZ> f;
+    icp.align(f);
+    std::cerr << "has converged:" << icp.hasConverged()
+              << " score: " << icp.getFitnessScore() << std::endl;
+    std::cerr << icp.getFinalTransformation() << std::endl;
+    Matrix final_ = pcl_to_eigen(f);
+    fgt::Vector translation = (target - final_).colwise().mean();
+    std::cerr << "Motion: " << translation.transpose() << std::endl;
     BoundsResult r;
     return r;
 }
@@ -300,4 +303,31 @@ CroppedFile::CroppedFile(const std::string& filename,
     assert(viewset.size() == 1);
     matrix = point_view_to_matrix(*viewset.begin());
     time = point_view_average_time(*viewset.begin());
+}
+
+pcl::PointCloud<pcl::PointXYZ>::Ptr eigen_to_pcl(const Matrix& matrix) {
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(
+        new pcl::PointCloud<pcl::PointXYZ>);
+    cloud->width = matrix.rows();
+    cloud->height = 1;
+    cloud->is_dense = false;
+    cloud->points.resize(cloud->width);
+
+    for (size_t i = 0; i < cloud->points.size(); ++i) {
+        cloud->points[i].x = float(matrix(i, 0));
+        cloud->points[i].y = float(matrix(i, 1));
+        cloud->points[i].z = float(matrix(i, 2));
+    }
+
+    return cloud;
+}
+
+Matrix pcl_to_eigen(const pcl::PointCloud<pcl::PointXYZ>& cloud) {
+    Matrix matrix(cloud.size(), 3);
+    for (size_t i = 0; i < cloud.points.size(); ++i) {
+        matrix(i, 0) = cloud.points[i].x;
+        matrix(i, 1) = cloud.points[i].y;
+        matrix(i, 2) = cloud.points[i].z;
+    }
+    return matrix;
 }
