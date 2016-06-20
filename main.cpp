@@ -22,6 +22,7 @@ static const char USAGE[] =
 Usage:
     hunky-dory cpd chip <source> <target> <outfile> [--capacity=n] [--sigma2=n] [--no-entwine]
     hunky-dory cpd bounds <source> <target> <bounds> [--sigma2=n]
+    hunky-dory icp bounds <source> <target> <bounds>
     hunky-dory (-h | --help)
     hunky-dory --version
 
@@ -43,34 +44,37 @@ struct CroppedFile {
     Matrix matrix;
     double time;
 };
-int main_cpd(const DocoptMap&);
-int main_cpd_chip(const DocoptMap&);
-int main_cpd_bounds(const DocoptMap&);
+int cpd_chip(const DocoptMap&);
+int cpd_bounds(const DocoptMap&);
+int icp_bounds(const DocoptMap&);
 
 int main(int argc, char** argv) {
     DocoptMap args = docopt::docopt(USAGE, {argv + 1, argv + argc}, true,
                                     hunky_dory::VERSION);
 
     if (args.at("cpd").asBool()) {
-        return main_cpd(args);
+        if (args.at("chip").asBool()) {
+            return cpd_chip(args);
+        } else if (args.at("bounds").asBool()) {
+            return cpd_bounds(args);
+        } else {
+            std::cerr << "Unsupported cpd method." << std::endl;
+            return 1;
+        }
+    } else if (args.at("icp").asBool()) {
+        if (args.at("bounds").asBool()) {
+            return icp_bounds(args);
+        } else {
+            std::cerr << "Unsupported icp method." << std::endl;
+            return 1;
+        }
     } else {
         std::cerr << "Unsupported registration method." << std::endl;
         return 1;
     }
 }
 
-int main_cpd(const DocoptMap& args) {
-    if (args.at("chip").asBool()) {
-        return main_cpd_chip(args);
-    } else if (args.at("bounds").asBool()) {
-        return main_cpd_bounds(args);
-    } else {
-        std::cerr << "Unsupported cpd method." << std::endl;
-        return 1;
-    }
-}
-
-int main_cpd_chip(const DocoptMap& args) {
+int cpd_chip(const DocoptMap& args) {
     std::string source_path = args.at("<source>").asString();
     std::string target_path = args.at("<target>").asString();
     std::ofstream outfile(args.at("<outfile>").asString());
@@ -158,7 +162,7 @@ int main_cpd_chip(const DocoptMap& args) {
     return 0;
 }
 
-int main_cpd_bounds(const DocoptMap& args) {
+int cpd_bounds(const DocoptMap& args) {
     std::stringstream bounds_ss(args.at("<bounds>").asString());
     pdal::BOX2D bounds;
     bounds_ss >> bounds;
@@ -200,6 +204,8 @@ int main_cpd_bounds(const DocoptMap& args) {
 
     return 0;
 }
+
+int icp_bounds(const DocoptMap& args) { return 0; }
 
 std::string infer_reader_driver(const pdal::StageFactory& factory,
                                 const std::string& path) {

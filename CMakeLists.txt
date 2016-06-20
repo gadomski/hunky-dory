@@ -7,6 +7,7 @@ configure_file(hunky_dory.hpp.in ${PROJECT_BINARY_DIR}/hunky_dory.hpp)
 
 find_package(Cpd REQUIRED)
 find_package(Entwine REQUIRED)
+find_package(Libpointmatcher REQUIRED)
 find_package(PDAL REQUIRED)
 
 add_executable(hunky-dory
@@ -24,6 +25,7 @@ target_link_libraries(hunky-dory
     Cpd::Headers
     Entwine::entwine
     pdalcpp
+    ${LIBPOINTMATCHER_LIBRARIES}
     )
 install(TARGETS hunky-dory
     RUNTIME DESTINATION bin
