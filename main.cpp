@@ -1,5 +1,7 @@
 #include <iostream>
 
+#include <pointmatcher/IO.h>
+#include <pointmatcher/PointMatcher.h>
 #include <cpd/rigid.hpp>
 #include <entwine/tree/builder.hpp>
 #include <pdal/ChipperFilter.hpp>
@@ -22,7 +24,7 @@ static const char USAGE[] =
 Usage:
     hunky-dory cpd chip <source> <target> <outfile> [--capacity=n] [--sigma2=n] [--no-entwine]
     hunky-dory cpd bounds <source> <target> <bounds> [--sigma2=n]
-    hunky-dory icp bounds <source> <target> <bounds>
+    hunky-dory icp bounds <source> <target> <bounds> <config>
     hunky-dory (-h | --help)
     hunky-dory --version
 
@@ -160,6 +162,8 @@ struct BoundsResult {
 
 BoundsResult cpd_bounds(const Matrix& source, const Matrix& target,
                         const DocoptMap& args);
+BoundsResult icp_bounds(const Matrix& source, const Matrix& target,
+                        const DocoptMap& args);
 
 int bounds(const DocoptMap& args) {
     std::stringstream bounds_ss(args.at("<bounds>").asString());
@@ -180,8 +184,10 @@ int bounds(const DocoptMap& args) {
     std::cerr << "done with " << target.rows() << " points.\n";
 
     BoundsResult result;
-    if (args.at("cpd").isBool()) {
+    if (args.at("cpd").asBool()) {
         result = cpd_bounds(source, target, args);
+    } else if (args.at("icp").asBool()) {
+        result = icp_bounds(source, target, args);
     } else {
         std::cerr << "Unsupported method." << std::endl;
         return 1;
@@ -221,7 +227,23 @@ BoundsResult cpd_bounds(const Matrix& source, const Matrix& target,
     return r;
 }
 
-int icp_bounds(const DocoptMap& args) { return 0; }
+BoundsResult icp_bounds(const Matrix& source, const Matrix& target,
+                        const DocoptMap& args) {
+    PointMatcherIO<double>::LabelGenerator label_generator;
+    label_generator.add("x");
+    label_generator.add("y");
+    label_generator.add("z");
+    PointMatcher<double>::DataPoints s(source.transpose(), label_generator.getLabels());
+    PointMatcher<double>::DataPoints t(target.transpose(), label_generator.getLabels());
+    PointMatcher<double>::ICP icp;
+    std::ifstream config(args.at("<config>").asString());
+    icp.loadFromYaml(config);
+    config.close();
+    PointMatcher<double>::TransformationParameters transform = icp(t, s);
+    std::cerr << transform << std::endl;
+    BoundsResult r;
+    return r;
+}
 
 std::string infer_reader_driver(const pdal::StageFactory& factory,
                                 const std::string& path) {
