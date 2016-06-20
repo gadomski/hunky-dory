@@ -44,37 +44,25 @@ struct CroppedFile {
     Matrix matrix;
     double time;
 };
-int cpd_chip(const DocoptMap&);
-int cpd_bounds(const DocoptMap&);
-int icp_bounds(const DocoptMap&);
+int chip(const DocoptMap&);
+int bounds(const DocoptMap&);
 
 int main(int argc, char** argv) {
     DocoptMap args = docopt::docopt(USAGE, {argv + 1, argv + argc}, true,
                                     hunky_dory::VERSION);
 
-    if (args.at("cpd").asBool()) {
-        if (args.at("chip").asBool()) {
-            return cpd_chip(args);
-        } else if (args.at("bounds").asBool()) {
-            return cpd_bounds(args);
-        } else {
-            std::cerr << "Unsupported cpd method." << std::endl;
-            return 1;
-        }
-    } else if (args.at("icp").asBool()) {
-        if (args.at("bounds").asBool()) {
-            return icp_bounds(args);
-        } else {
-            std::cerr << "Unsupported icp method." << std::endl;
-            return 1;
-        }
+    if (args.at("chip").asBool()) {
+        return chip(args);
+    } else if (args.at("bounds").asBool()) {
+        return bounds(args);
     } else {
-        std::cerr << "Unsupported registration method." << std::endl;
+        std::cerr << "Unsupported action." << std::endl;
         return 1;
     }
 }
 
-int cpd_chip(const DocoptMap& args) {
+// TODO not actually generalized for multiple methods
+int chip(const DocoptMap& args) {
     std::string source_path = args.at("<source>").asString();
     std::string target_path = args.at("<target>").asString();
     std::ofstream outfile(args.at("<outfile>").asString());
@@ -162,7 +150,18 @@ int cpd_chip(const DocoptMap& args) {
     return 0;
 }
 
-int cpd_bounds(const DocoptMap& args) {
+struct BoundsResult {
+    double runtime;
+    int iterations;
+    double dx;
+    double dy;
+    double dz;
+};
+
+BoundsResult cpd_bounds(const Matrix& source, const Matrix& target,
+                        const DocoptMap& args);
+
+int bounds(const DocoptMap& args) {
     std::stringstream bounds_ss(args.at("<bounds>").asString());
     pdal::BOX2D bounds;
     bounds_ss >> bounds;
@@ -179,16 +178,14 @@ int cpd_bounds(const DocoptMap& args) {
     CroppedFile target_file(args.at("<target>").asString(), bounds);
     Matrix target = target_file.matrix;
     std::cerr << "done with " << target.rows() << " points.\n";
-    double sigma2 = std::stod(args.at("--sigma2").asString());
 
-    cpd::Options options(std::cerr);
-    options.set_sigma2(sigma2);
-    cpd::RigidResult<Matrix> result = cpd::rigid(source, target, options);
-
-    fgt::Vector translation = (target - result.moving).colwise().mean();
-    std::cerr << "Runtime: " << result.runtime
-              << "s\nMotion:" << translation.transpose() << "\n";
-
+    BoundsResult result;
+    if (args.at("cpd").isBool()) {
+        result = cpd_bounds(source, target, args);
+    } else {
+        std::cerr << "Unsupported method." << std::endl;
+        return 1;
+    }
     std::cout << std::fixed;
     std::cout << "{\"runtime\": " << result.runtime
               << ", \"num_source\": " << source.rows()
@@ -198,11 +195,30 @@ int cpd_bounds(const DocoptMap& args) {
               << ", \"iterations\": " << result.iterations
               << ", \"minx\": " << bounds.minx << ", \"maxx\": " << bounds.maxx
               << ", \"miny\": " << bounds.miny << ", \"maxy\": " << bounds.maxy
-              << ", \"dx\": " << translation(0)
-              << ", \"dy\": " << translation(1)
-              << ", \"dz\": " << translation(2) << "}\n";
+              << ", \"dx\": " << result.dx << ", \"dy\": " << result.dy
+              << ", \"dz\": " << result.dz << "}\n";
 
     return 0;
+}
+
+BoundsResult cpd_bounds(const Matrix& source, const Matrix& target,
+                        const DocoptMap& args) {
+    double sigma2 = std::stod(args.at("--sigma2").asString());
+
+    cpd::Options options(std::cerr);
+    options.set_sigma2(sigma2);
+    cpd::RigidResult<Matrix> result = cpd::rigid(source, target, options);
+
+    fgt::Vector translation = (target - result.moving).colwise().mean();
+    std::cerr << "Runtime: " << result.runtime
+              << "s\nMotion:" << translation.transpose() << "\n";
+    BoundsResult r;
+    r.runtime = result.runtime;
+    r.iterations = result.iterations;
+    r.dx = translation(0);
+    r.dy = translation(1);
+    r.dz = translation(2);
+    return r;
 }
 
 int icp_bounds(const DocoptMap& args) { return 0; }
