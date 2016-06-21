@@ -1,14 +1,14 @@
 #include <iostream>
 
-#include <pcl/registration/icp.h>
 #include <cpd/rigid.hpp>
 #include <entwine/tree/tiler.hpp>
 #include <entwine/types/schema.hpp>
 #include <pdal/ChipperFilter.hpp>
 #include <pdal/PointViewIter.hpp>
 
-#include "docopt.h"
+#include "cpd.hpp"
 #include "hunky_dory.hpp"
+#include "icp.hpp"
 #include "utils.hpp"
 
 static const char USAGE[] =
@@ -35,13 +35,11 @@ Options:
     --no-entwine    Don't use entwine's index — use PDAL's chipper instead.
 )";
 
-typedef std::map<std::string, docopt::value> DocoptMap;
-
-int chip(const DocoptMap&);
-int bounds(const DocoptMap&);
+int chip(const hunky_dory::DocoptMap&);
+int bounds(const hunky_dory::DocoptMap&);
 
 int main(int argc, char** argv) {
-    DocoptMap args = docopt::docopt(USAGE, {argv + 1, argv + argc}, true,
+    hunky_dory::DocoptMap args = docopt::docopt(USAGE, {argv + 1, argv + argc}, true,
                                     hunky_dory::VERSION);
 
     if (args.at("chip").asBool()) {
@@ -55,7 +53,7 @@ int main(int argc, char** argv) {
 }
 
 // TODO not actually generalized for multiple methods
-int chip(const DocoptMap& args) {
+int chip(const hunky_dory::DocoptMap& args) {
     std::string source_path = args.at("<source>").asString();
     std::string target_path = args.at("<target>").asString();
     std::ofstream outfile(args.at("<outfile>").asString());
@@ -70,9 +68,9 @@ int chip(const DocoptMap& args) {
         pdal::StageFactory factory(false);
 
         pdal::Stage* source_reader =
-            infer_and_create_reader(factory, source_path);
+            hunky_dory::infer_and_create_reader(factory, source_path);
         pdal::Stage* target_reader =
-            infer_and_create_reader(factory, target_path);
+            hunky_dory::infer_and_create_reader(factory, target_path);
 
         pdal::Options chipper_options;
         chipper_options.add("capacity", capacity);
@@ -88,18 +86,18 @@ int chip(const DocoptMap& args) {
         std::cout << "done, with " << viewset.size() << " chips\n";
 
         for (auto source_view : viewset) {
-            Matrix source = point_view_to_matrix(source_view);
+            hunky_dory::Matrix source = hunky_dory::point_view_to_matrix(source_view);
             pdal::BOX2D bounds;
             source_view->calculateBounds(bounds);
 
             std::cout << "Cropping target data..." << std::flush;
-            CroppedFile target_file(target_path, bounds);
+            hunky_dory::CroppedFile target_file(target_path, bounds);
             std::cout << "done\n";
-            Matrix target = target_file.matrix;
+            hunky_dory::Matrix target = target_file.matrix;
 
             cpd::Options options;
             options.set_sigma2(sigma2);
-            cpd::RigidResult<Matrix> result =
+            cpd::RigidResult<hunky_dory::Matrix> result =
                 cpd::rigid(source, target, options);
             fgt::Vector translation =
                 (target - result.moving).colwise().mean().transpose();
@@ -133,20 +131,7 @@ int chip(const DocoptMap& args) {
     return 0;
 }
 
-struct BoundsResult {
-    double runtime;
-    int iterations;
-    double dx;
-    double dy;
-    double dz;
-};
-
-BoundsResult cpd_bounds(const Matrix& source, const Matrix& target,
-                        const DocoptMap& args);
-BoundsResult icp_bounds(const Matrix& source, const Matrix& target,
-                        const DocoptMap& args);
-
-int bounds(const DocoptMap& args) {
+int bounds(const hunky_dory::DocoptMap& args) {
     std::stringstream bounds_ss(args.at("<bounds>").asString());
     pdal::BOX2D bounds;
     bounds_ss >> bounds;
@@ -156,19 +141,19 @@ int bounds(const DocoptMap& args) {
     }
 
     std::cerr << "Cropping source file..." << std::flush;
-    CroppedFile source_file(args.at("<source>").asString(), bounds);
-    Matrix source = source_file.matrix;
+    hunky_dory::CroppedFile source_file(args.at("<source>").asString(), bounds);
+    hunky_dory::Matrix source = source_file.matrix;
     std::cerr << "done with " << source.rows()
               << " points.\nCropping target file..." << std::flush;
-    CroppedFile target_file(args.at("<target>").asString(), bounds);
-    Matrix target = target_file.matrix;
+    hunky_dory::CroppedFile target_file(args.at("<target>").asString(), bounds);
+    hunky_dory::Matrix target = target_file.matrix;
     std::cerr << "done with " << target.rows() << " points.\n";
 
-    BoundsResult result;
+    hunky_dory::Result result;
     if (args.at("cpd").asBool()) {
-        result = cpd_bounds(source, target, args);
+        result = hunky_dory::cpd(source, target, args);
     } else if (args.at("icp").asBool()) {
-        result = icp_bounds(source, target, args);
+        result = hunky_dory::icp(source, target, args);
     } else {
         std::cerr << "Unsupported method." << std::endl;
         return 1;
@@ -186,52 +171,4 @@ int bounds(const DocoptMap& args) {
               << ", \"dz\": " << result.dz << "}\n";
 
     return 0;
-}
-
-BoundsResult cpd_bounds(const Matrix& source, const Matrix& target,
-                        const DocoptMap& args) {
-    double sigma2 = std::stod(args.at("--sigma2").asString());
-
-    cpd::Options options(std::cerr);
-    options.set_sigma2(sigma2);
-    cpd::RigidResult<Matrix> result = cpd::rigid(source, target, options);
-
-    fgt::Vector translation = (target - result.moving).colwise().mean();
-    std::cerr << "Runtime: " << result.runtime
-              << "s\nMotion:" << translation.transpose() << "\n";
-    BoundsResult r;
-    r.runtime = result.runtime;
-    r.iterations = result.iterations;
-    r.dx = translation(0);
-    r.dy = translation(1);
-    r.dz = translation(2);
-    return r;
-}
-
-BoundsResult icp_bounds(const Matrix& source, const Matrix& target,
-                        const DocoptMap& args) {
-    auto tic = std::chrono::high_resolution_clock::now();
-    pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
-    auto s = eigen_to_pcl(source);
-    auto t = eigen_to_pcl(target);
-    // yes source and target are backwards, deal with it
-    icp.setInputSource(t);
-    icp.setInputTarget(s);
-    pcl::PointCloud<pcl::PointXYZ> f;
-    icp.align(f);
-    std::cerr << "has converged:" << icp.hasConverged()
-              << " score: " << icp.getFitnessScore() << std::endl;
-    Matrix final_ = pcl_to_eigen(f);
-    fgt::Vector translation = (target - final_).colwise().mean();
-    std::cerr << "Motion: " << translation.transpose() << std::endl;
-    BoundsResult r;
-    auto toc = std::chrono::high_resolution_clock::now();
-    r.runtime =
-        std::chrono::duration_cast<std::chrono::duration<double>>(toc - tic)
-            .count();
-    r.iterations = -1;
-    r.dx = translation(0);
-    r.dy = translation(1);
-    r.dz = translation(2);
-    return r;
 }

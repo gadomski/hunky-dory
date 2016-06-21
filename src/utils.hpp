@@ -1,11 +1,18 @@
+#pragma once
+
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <Eigen/Dense>
 #include <pdal/Stage.hpp>
 #include <pdal/StageFactory.hpp>
 
+#include "docopt.h"
+
+namespace hunky_dory {
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
     Matrix;
+typedef Eigen::Matrix<double, Eigen::Dynamic, 1> Vector;
+typedef std::map<std::string, docopt::value> DocoptMap;
 
 pdal::Stage* infer_and_create_reader(pdal::StageFactory&, const std::string&);
 Matrix point_view_to_matrix(const pdal::PointViewPtr);
@@ -17,3 +24,12 @@ struct CroppedFile {
     Matrix matrix;
     double time;
 };
+
+struct Result {
+    double runtime;
+    int iterations;
+    double dx;
+    double dy;
+    double dz;
+};
+}

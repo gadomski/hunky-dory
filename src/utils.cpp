@@ -2,6 +2,7 @@
 
 #include "utils.hpp"
 
+namespace hunky_dory {
 std::string infer_reader_driver(const pdal::StageFactory& factory,
                                 const std::string& path) {
     std::string driver = factory.inferReaderDriver(path);
@@ -84,4 +85,5 @@ Matrix pcl_to_eigen(const pcl::PointCloud<pcl::PointXYZ>& cloud) {
         matrix(i, 2) = cloud.points[i].z;
     }
     return matrix;
+}
 }

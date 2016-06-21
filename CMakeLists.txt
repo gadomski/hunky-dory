@@ -3,7 +3,7 @@ project(hunky-dory LANGUAGES CXX VERSION 0.1.0)
 
 set(CMAKE_CXX_STANDARD 11)
 
-configure_file(hunky_dory.hpp.in ${PROJECT_BINARY_DIR}/hunky_dory.hpp)
+configure_file(src/hunky_dory.hpp.in ${PROJECT_BINARY_DIR}/hunky_dory.hpp)
 
 find_package(Cpd REQUIRED)
 find_package(Entwine REQUIRED)
@@ -11,7 +11,9 @@ find_package(PCL REQUIRED)
 find_package(PDAL REQUIRED)
 
 add_executable(hunky-dory
+    src/cpd.cpp
     src/main.cpp
+    src/icp.cpp
     src/utils.cpp
     vendor/docopt.cpp/docopt.cpp
     )
