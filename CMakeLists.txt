@@ -11,6 +11,8 @@ find_package(PCL REQUIRED)
 find_package(PDAL REQUIRED)
 
 add_executable(hunky-dory
+    src/bounds.cpp
+    src/chip.cpp
     src/cpd.cpp
     src/main.cpp
     src/icp.cpp
