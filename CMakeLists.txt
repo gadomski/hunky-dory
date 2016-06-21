@@ -11,7 +11,8 @@ find_package(PCL REQUIRED)
 find_package(PDAL REQUIRED)
 
 add_executable(hunky-dory
-    main.cpp
+    src/main.cpp
+    src/utils.cpp
     vendor/docopt.cpp/docopt.cpp
     )
 target_include_directories(hunky-dory
