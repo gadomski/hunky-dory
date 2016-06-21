@@ -2,7 +2,8 @@
 
 #include <pcl/registration/icp.h>
 #include <cpd/rigid.hpp>
-#include <entwine/tree/builder.hpp>
+#include <entwine/tree/tiler.hpp>
+#include <entwine/types/schema.hpp>
 #include <pdal/ChipperFilter.hpp>
 #include <pdal/CropFilter.hpp>
 #include <pdal/PointViewIter.hpp>
@@ -85,7 +86,7 @@ int chip(const DocoptMap& args) {
             infer_and_create_reader(factory, target_path);
 
         pdal::Options chipper_options;
-        chipper_options.add("capacity", capacity, "");
+        chipper_options.add("capacity", capacity);
         pdal::ChipperFilter chipper;
         chipper.setInput(*source_reader);
         chipper.setOptions(chipper_options);
@@ -138,16 +139,18 @@ int chip(const DocoptMap& args) {
         }
     } else {
         std::cout << "Using entwine indices\n";
-        entwine::Builder builder(source_path);
+        entwine::arbiter::Arbiter a;
+        const entwine::arbiter::Endpoint source(a.getEndpoint(source_path));
         entwine::Schema xyz({entwine::DimInfo("X", "floating", 8),
                              entwine::DimInfo("Y", "floating", 8),
                              entwine::DimInfo("Z", "floating", 8)});
+        entwine::Tiler t(source, 6, 1000, &xyz);
         auto handler([&](pdal::PointView& view, entwine::BBox bbox) {
             std::cout << "Number of points: " << view.size() << "\n";
             return true;
         });
 
-        builder.traverse(1, 100, handler, &xyz);
+        t.go(handler);
     }
     outfile.close();
     return 0;
