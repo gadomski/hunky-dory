@@ -62,13 +62,14 @@ CroppedFile::CroppedFile(const std::string& filename,
         size_t row(0);
         while (query->next(buffer)) {
             entwine::VectorPointTable table(ENTWINE_XYZ_SCHEMA, buffer);
-            for (size_t i = 0; i < table.size(); ++i, ++row) {
-                auto point = table.getPointAt(i);
+            for (auto point : table) {
                 data(row, 0) = point.getFieldAs<double>(pdal::Dimension::Id::X);
                 data(row, 1) = point.getFieldAs<double>(pdal::Dimension::Id::Y);
                 data(row, 2) = point.getFieldAs<double>(pdal::Dimension::Id::Z);
+                ++row;
             }
         }
+        matrix = data;
         time = 0.0;
     } else {
         pdal::Options options;
