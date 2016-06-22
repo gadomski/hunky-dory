@@ -1,6 +1,5 @@
-#include <pdal/ChipperFilter.hpp>
 #include <entwine/tree/tiler.hpp>
-#include <entwine/types/schema.hpp>
+#include <pdal/ChipperFilter.hpp>
 
 #include "chip.hpp"
 #include "cpd.hpp"
@@ -41,7 +40,8 @@ int chip(const hunky_dory::DocoptMap& args) {
         std::cout << "done, with " << viewset.size() << " chips\n";
 
         for (auto source_view : viewset) {
-            hunky_dory::Matrix source = hunky_dory::point_view_to_matrix(source_view);
+            hunky_dory::Matrix source =
+                hunky_dory::point_view_to_matrix(source_view);
             pdal::BOX2D bounds;
             source_view->calculateBounds(bounds);
 
@@ -51,23 +51,19 @@ int chip(const hunky_dory::DocoptMap& args) {
             hunky_dory::Matrix target = target_file.matrix;
 
             Result result = cpd(source, target, args);
-            std::cout << "Runtime: " << result.runtime
-                << "s\nAverage motion:\n"
-                << result.dx << ", " << result.dy << ", " << result.dz << "\n";
-            outfile << bounds.minx << " " << bounds.maxx << " "
-                << bounds.miny << " " << bounds.maxy << " "
-                << result.dx << " " << result.dy << " "
-                << result.dz << "\n";
+            std::cout << "Runtime: " << result.runtime << "s\nAverage motion:\n"
+                      << result.dx << ", " << result.dy << ", " << result.dz
+                      << "\n";
+            outfile << bounds.minx << " " << bounds.maxx << " " << bounds.miny
+                    << " " << bounds.maxy << " " << result.dx << " "
+                    << result.dy << " " << result.dz << "\n";
             outfile << std::flush;
         }
     } else {
         std::cout << "Using entwine indices\n";
         entwine::arbiter::Arbiter a;
         const entwine::arbiter::Endpoint source(a.getEndpoint(source_path));
-        entwine::Schema xyz({entwine::DimInfo("X", "floating", 8),
-                             entwine::DimInfo("Y", "floating", 8),
-                             entwine::DimInfo("Z", "floating", 8)});
-        entwine::Tiler t(source, 6, 1000, &xyz);
+        entwine::Tiler t(source, 6, 1000, &ENTWINE_XYZ_SCHEMA);
         auto handler([&](pdal::PointView& view, entwine::BBox bbox) {
             std::cout << "Number of points: " << view.size() << "\n";
             return true;
@@ -78,6 +74,4 @@ int chip(const hunky_dory::DocoptMap& args) {
     outfile.close();
     return 0;
 }
-
-
 }

@@ -1,3 +1,7 @@
+#include <entwine/reader/cache.hpp>
+#include <entwine/reader/query.hpp>
+#include <entwine/reader/reader.hpp>
+#include <entwine/types/vector-point-table.hpp>
 #include <pdal/CropFilter.hpp>
 
 #include "utils.hpp"
@@ -5,13 +9,7 @@
 namespace hunky_dory {
 std::string infer_reader_driver(const pdal::StageFactory& factory,
                                 const std::string& path) {
-    std::string driver = factory.inferReaderDriver(path);
-    if (driver.empty()) {
-        std::stringstream ss;
-        ss << "Unable to infer reader driver for path: " << path;
-        throw std::runtime_error(ss.str());
-    }
-    return driver;
+    return factory.inferReaderDriver(path);
 }
 
 pdal::Stage* infer_and_create_reader(pdal::StageFactory& factory,
@@ -19,6 +17,9 @@ pdal::Stage* infer_and_create_reader(pdal::StageFactory& factory,
     pdal::Options options;
     options.add("filename", path);
     std::string driver = infer_reader_driver(factory, path);
+    if (driver.empty()) {
+        return nullptr;
+    }
     pdal::Stage* reader = factory.createStage(driver);
     reader->setOptions(options);
     return reader;
@@ -47,17 +48,41 @@ CroppedFile::CroppedFile(const std::string& filename,
                          const pdal::BOX2D& bounds) {
     pdal::StageFactory factory(false);
     pdal::Stage* reader = infer_and_create_reader(factory, filename);
-    pdal::Options options;
-    options.add("bounds", bounds);
-    pdal::CropFilter crop;
-    crop.setInput(*reader);
-    crop.setOptions(options);
-    pdal::PointTable table;
-    crop.prepare(table);
-    pdal::PointViewSet viewset = crop.execute(table);
-    assert(viewset.size() == 1);
-    matrix = point_view_to_matrix(*viewset.begin());
-    time = point_view_average_time(*viewset.begin());
+    if (!reader) {
+        // try entwine
+        entwine::arbiter::Arbiter arbiter;
+        entwine::arbiter::Endpoint endpoint(arbiter.getEndpoint(filename));
+        entwine::Cache cache(100);
+        entwine::Reader entwine_reader(endpoint, arbiter, cache);
+        entwine::BBox bbox = box2d_to_bbox(bounds);
+        auto query = entwine_reader.query(ENTWINE_XYZ_SCHEMA, bbox, 0,
+                                          std::numeric_limits<size_t>::max());
+        std::vector<char> buffer;
+        Matrix data(query->numPoints(), 3);
+        size_t row(0);
+        while (query->next(buffer)) {
+            entwine::VectorPointTable table(ENTWINE_XYZ_SCHEMA, buffer);
+            for (size_t i = 0; i < table.size(); ++i, ++row) {
+                auto point = table.getPointAt(i);
+                data(row, 0) = point.getFieldAs<double>(pdal::Dimension::Id::X);
+                data(row, 1) = point.getFieldAs<double>(pdal::Dimension::Id::Y);
+                data(row, 2) = point.getFieldAs<double>(pdal::Dimension::Id::Z);
+            }
+        }
+        time = 0.0;
+    } else {
+        pdal::Options options;
+        options.add("bounds", bounds);
+        pdal::CropFilter crop;
+        crop.setInput(*reader);
+        crop.setOptions(options);
+        pdal::PointTable table;
+        crop.prepare(table);
+        pdal::PointViewSet viewset = crop.execute(table);
+        assert(viewset.size() == 1);
+        matrix = point_view_to_matrix(*viewset.begin());
+        time = point_view_average_time(*viewset.begin());
+    }
 }
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr eigen_to_pcl(const Matrix& matrix) {
@@ -85,5 +110,11 @@ Matrix pcl_to_eigen(const pcl::PointCloud<pcl::PointXYZ>& cloud) {
         matrix(i, 2) = cloud.points[i].z;
     }
     return matrix;
+}
+
+entwine::BBox box2d_to_bbox(const pdal::BOX2D& box2d) {
+    entwine::Point min(box2d.minx, box2d.miny);
+    entwine::Point max(box2d.maxx, box2d.maxy);
+    return entwine::BBox(min, max);
 }
 }
