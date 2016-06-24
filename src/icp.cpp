@@ -23,7 +23,7 @@ Result icp(const Matrix& source, const Matrix& target, const DocoptMap& args) {
     r.runtime =
         std::chrono::duration_cast<std::chrono::duration<double>>(toc - tic)
             .count();
-    r.iterations = -1;
+    r.iterations = 0;
     r.dx = translation(0);
     r.dy = translation(1);
     r.dz = translation(2);
