@@ -3,10 +3,10 @@
 
 #include "chip.hpp"
 #include "cpd.hpp"
+#include "icp.hpp"
 
 namespace hunky_dory {
 
-// TODO not actually generalized for multiple methods
 int chip(const hunky_dory::DocoptMap& args) {
     std::string source_path = args.at("<source>").asString();
     std::string target_path = args.at("<target>").asString();
@@ -50,7 +50,15 @@ int chip(const hunky_dory::DocoptMap& args) {
             std::cout << "done\n";
             hunky_dory::Matrix target = target_file.matrix;
 
-            Result result = cpd(source, target, args);
+            Result result;
+            if (args.at("cpd").asBool()) {
+                result = cpd(source, target, args);
+            } else if (args.at("icp").asBool()) {
+                result = icp(source, target, args);
+            } else {
+                std::cerr << "Unsupported method." << std::endl;
+                return 1;
+            }
             std::cout << "Runtime: " << result.runtime << "s\nAverage motion:\n"
                       << result.dx << ", " << result.dy << ", " << result.dz
                       << "\n";

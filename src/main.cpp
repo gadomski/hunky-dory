@@ -15,6 +15,7 @@ static const char USAGE[] =
 Usage:
     hunky-dory cpd chip <source> <target> <outfile> [--capacity=n] [--sigma2=n] [--no-entwine]
     hunky-dory cpd bounds <source> <target> <bounds> [--sigma2=n]
+    hunky-dory icp chip <source> <target> <outfile> [--capacity=n] [--no-entwine]
     hunky-dory icp bounds <source> <target> <bounds>
     hunky-dory (-h | --help)
     hunky-dory --version
