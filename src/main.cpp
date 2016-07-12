@@ -14,7 +14,7 @@ static const char USAGE[] =
 
 Usage:
     hunky-dory cpd chip <source> <target> <outfile> [--capacity=n] [--sigma2=n] [--no-entwine]
-    hunky-dory cpd bounds <source> <target> <bounds> [--sigma2=n]
+    hunky-dory cpd bounds <source> <target> <bounds> [--sigma2=n] [--outlier=n]
     hunky-dory icp chip <source> <target> <outfile> [--capacity=n] [--no-entwine]
     hunky-dory icp bounds <source> <target> <bounds>
     hunky-dory (-h | --help)
@@ -25,6 +25,7 @@ Options:
     --version       Show version.
     --capacity=n    Approximate capacity of each tile/chip/segment. [default: 20000]
     --sigma2=n      Starting bandwidth for CPD alignment calculations. [default: 5.0]
+    --outlier=n     Outlier weight for CPD alignment calculations. [default: 0.1]
     --no-entwine    Don't use entwine's index — use PDAL's chipper instead.
 )";
 
