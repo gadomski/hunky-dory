@@ -72,7 +72,7 @@ int chip(const hunky_dory::DocoptMap& args) {
         entwine::arbiter::Arbiter a;
         const entwine::arbiter::Endpoint source(a.getEndpoint(source_path));
         entwine::Tiler t(source, 6, 1000, &ENTWINE_XYZ_SCHEMA);
-        auto handler([&](pdal::PointView& view, entwine::BBox bbox) {
+        auto handler([&](pdal::PointView& view, entwine::Bounds bbox) {
             std::cout << "Number of points: " << view.size() << "\n";
             return true;
         });

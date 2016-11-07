@@ -28,7 +28,7 @@ target_include_directories(hunky-dory
     )
 target_link_libraries(hunky-dory
     PRIVATE
-    Cpd::Headers
+    Cpd::Library-C++
     Entwine::entwine
     pdalcpp
     ${PCL_LIBRARIES}

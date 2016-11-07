@@ -50,27 +50,7 @@ CroppedFile::CroppedFile(const std::string& filename,
     pdal::Stage* reader = infer_and_create_reader(factory, filename);
     if (!reader) {
         // try entwine
-        entwine::arbiter::Arbiter arbiter;
-        entwine::arbiter::Endpoint endpoint(arbiter.getEndpoint(filename));
-        entwine::Cache cache(100);
-        entwine::Reader entwine_reader(endpoint, arbiter, cache);
-        entwine::BBox bbox = box2d_to_bbox(bounds);
-        auto query = entwine_reader.query(ENTWINE_XYZ_SCHEMA, bbox, 0,
-                                          std::numeric_limits<size_t>::max());
-        std::vector<char> buffer;
-        Matrix data(query->numPoints(), 3);
-        size_t row(0);
-        while (query->next(buffer)) {
-            entwine::VectorPointTable table(ENTWINE_XYZ_SCHEMA, buffer);
-            for (auto point : table) {
-                data(row, 0) = point.getFieldAs<double>(pdal::Dimension::Id::X);
-                data(row, 1) = point.getFieldAs<double>(pdal::Dimension::Id::Y);
-                data(row, 2) = point.getFieldAs<double>(pdal::Dimension::Id::Z);
-                ++row;
-            }
-        }
-        matrix = data;
-        time = 0.0;
+        assert(false);
     } else {
         pdal::Options options;
         options.add("bounds", bounds);
@@ -113,9 +93,9 @@ Matrix pcl_to_eigen(const pcl::PointCloud<pcl::PointXYZ>& cloud) {
     return matrix;
 }
 
-entwine::BBox box2d_to_bbox(const pdal::BOX2D& box2d) {
+entwine::Bounds box2d_to_bbox(const pdal::BOX2D& box2d) {
     entwine::Point min(box2d.minx, box2d.miny);
     entwine::Point max(box2d.maxx, box2d.maxy);
-    return entwine::BBox(min, max);
+    return entwine::Bounds(min, max);
 }
 }

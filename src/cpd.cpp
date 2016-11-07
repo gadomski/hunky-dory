@@ -1,4 +1,6 @@
+#include <cpd/comparer.hpp>
 #include <cpd/rigid.hpp>
+#include <cpd/runner.hpp>
 
 #include "cpd.hpp"
 
@@ -6,21 +8,20 @@ namespace hunky_dory {
 
 Result cpd(const Matrix& source, const Matrix& target, const DocoptMap& args) {
     double sigma2 = std::stod(args.at("--sigma2").asString());
-    double outlier = std::stod(args.at("--outlier").asString());
+    double outliers = std::stod(args.at("--outliers").asString());
 
-    ::cpd::Options options(std::cerr);
-    options.set_sigma2(sigma2).set_outliers(outlier);
-    ::cpd::RigidResult<Matrix> result = cpd::rigid(source, target, options);
+    cpd::Runner<cpd::Rigid, cpd::FgtComparer> runner;
+    runner.sigma2(sigma2).outliers(outliers);
+    cpd::Rigid::Result result = runner.run(source, target);
 
-    Vector translation = (target - result.moving).colwise().mean();
-    std::cerr << "Runtime: " << result.runtime
-              << "s\nMotion:" << translation.transpose() << "\n";
+    std::cerr << "Runtime: " << result.runtime.count()
+              << "s\nMotion:" << result.translation.transpose() << "\n";
     Result r;
-    r.runtime = result.runtime;
+    r.runtime = result.runtime.count();
     r.iterations = result.iterations;
-    r.dx = translation(0);
-    r.dy = translation(1);
-    r.dz = translation(2);
+    r.dx = result.translation(0);
+    r.dy = result.translation(1);
+    r.dz = result.translation(2);
     return r;
 }
 }
