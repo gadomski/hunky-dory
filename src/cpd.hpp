@@ -1,7 +1,10 @@
 #pragma once
 
-#include "utils.hpp"
+#include "Eigen/Dense"
 
 namespace hunky_dory {
-Result cpd(const Matrix& source, const Matrix& target, const DocoptMap& args);
+Eigen::MatrixXd cpd_rigid(const Eigen::MatrixXd& fixed,
+                          const Eigen::MatrixXd& moving, double sigma2);
+Eigen::MatrixXd cpd_nonrigid(const Eigen::MatrixXd& fixed,
+                             const Eigen::MatrixXd& moving, double sigma2);
 }

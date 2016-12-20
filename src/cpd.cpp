@@ -1,27 +1,24 @@
-#include <cpd/comparer/base.hpp>
-#include <cpd/rigid.hpp>
-#include <cpd/runner.hpp>
-
 #include "cpd.hpp"
+#include "cpd/nonrigid.hpp"
+#include "cpd/rigid.hpp"
+#include "cpd/runner.hpp"
 
 namespace hunky_dory {
+Eigen::MatrixXd cpd_rigid(const Eigen::MatrixXd& fixed,
+                          const Eigen::MatrixXd& moving, double sigma2) {
+    cpd::Rigid rigid;
+    std::unique_ptr<cpd::Comparer> comparer = cpd::Comparer::from_name("fgt");
+    cpd::Runner<cpd::Rigid> runner(rigid);
+    runner.comparer(std::move(comparer)).sigma2(sigma2);
+    return runner.run(fixed, moving).points;
+}
 
-Result cpd(const Matrix& source, const Matrix& target, const DocoptMap& args) {
-    double sigma2 = std::stod(args.at("--sigma2").asString());
-    double outliers = std::stod(args.at("--outliers").asString());
-
-    cpd::Runner<cpd::Rigid> runner;
-    runner.sigma2(sigma2).outliers(outliers).comparer(cpd::Comparer::from_name("fgt"));
-    cpd::Rigid::Result result = runner.run(source, target);
-
-    std::cerr << "Runtime: " << result.runtime.count()
-              << "s\nMotion:" << result.translation.transpose() << "\n";
-    Result r;
-    r.runtime = result.runtime.count();
-    r.iterations = result.iterations;
-    r.dx = result.translation(0);
-    r.dy = result.translation(1);
-    r.dz = result.translation(2);
-    return r;
+Eigen::MatrixXd cpd_nonrigid(const Eigen::MatrixXd& fixed,
+                             const Eigen::MatrixXd& moving, double sigma2) {
+    cpd::Nonrigid nonrigid;
+    std::unique_ptr<cpd::Comparer> comparer = cpd::Comparer::from_name("fgt");
+    cpd::Runner<cpd::Nonrigid> runner(nonrigid);
+    runner.comparer(std::move(comparer)).sigma2(sigma2);
+    return runner.run(fixed, moving).points;
 }
 }

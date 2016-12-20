@@ -1,38 +1,29 @@
+project(hunky-dory CXX)
 cmake_minimum_required(VERSION 3.2)
-project(hunky-dory LANGUAGES CXX VERSION 0.1.0)
 
-set(CMAKE_CXX_STANDARD 11)
-
-configure_file(src/hunky_dory.hpp.in ${PROJECT_BINARY_DIR}/hunky_dory.hpp)
+set(CMAKE_SKIP_BUILD_RPATH  FALSE)
+set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE) 
+set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+list(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
+if("${isSystemDir}" STREQUAL "-1")
+   set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+endif("${isSystemDir}" STREQUAL "-1")
 
 find_package(Cpd REQUIRED)
-find_package(Entwine REQUIRED)
-find_package(PCL REQUIRED)
 find_package(PDAL REQUIRED)
+set(DOCOPT_DIR vendor/docopt.cpp-af03fa0)
 
 add_executable(hunky-dory
     src/bounds.cpp
-    src/chip.cpp
     src/cpd.cpp
+    src/create_reader.cpp
     src/main.cpp
-    src/icp.cpp
-    src/utils.cpp
-    vendor/docopt.cpp/docopt.cpp
+    src/read.cpp
+    src/write.cpp
+    ${DOCOPT_DIR}/docopt.cpp
     )
-target_include_directories(hunky-dory
-    PRIVATE
-    ${PROJECT_BINARY_DIR}
-    vendor/docopt.cpp
-    ${PDAL_INCLUDE_DIRS}
-    ${PCL_INCLUDE_DIRS}
-    )
-target_link_libraries(hunky-dory
-    PRIVATE
-    Cpd::Library-C++
-    Entwine::entwine
-    pdalcpp
-    ${PCL_LIBRARIES}
-    )
-install(TARGETS hunky-dory
-    RUNTIME DESTINATION bin
-    )
+target_link_libraries(hunky-dory PUBLIC Cpd::Library-C++ ${PDAL_LIBRARIES})
+target_include_directories(hunky-dory PRIVATE ${DOCOPT_DIR})
+
+install(TARGETS hunky-dory RUNTIME DESTINATION bin)

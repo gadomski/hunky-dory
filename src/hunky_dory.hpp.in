@@ -1,3 +1,0 @@
-namespace hunky_dory {
-static const char VERSION[] = "@PROJECT_VERSION@";
-}

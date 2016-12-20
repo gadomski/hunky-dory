@@ -1,3 +1,0 @@
-[submodule "vendor/docopt.cpp"]
-	path = vendor/docopt.cpp
-	url = https://github.com/docopt/docopt.cpp.git

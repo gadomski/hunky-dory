@@ -1,7 +1,9 @@
 #pragma once
 
-#include "utils.hpp"
+#include <pdal/PointTable.hpp>
+#include <pdal/PointView.hpp>
 
 namespace hunky_dory {
-int bounds(const hunky_dory::DocoptMap&);
+std::vector<pdal::Bounds> bounds(const std::string& filename,
+                                 pdal::point_count_t capacity);
 }
