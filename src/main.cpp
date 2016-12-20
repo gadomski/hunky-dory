@@ -21,8 +21,7 @@ static const char USAGE[] =
         - David Bowie, "Changes"
 
 Usage:
-    hunky-dory cpd rigid <file1> <file2> <outfile> [--capacity=<n>] [--sigma2=<n>] [--limit=<n>] [--driver=<driver>] [--edge-length=<n>] [--radius=<n>] [--no-data=<n>] [--window-size=<n>] [--dump-bounds=<filename>]
-    hunky-dory cpd nonrigid <file1> <file2> <outfile> [--capacity=<n>] [--sigma2=<n>] [--limit=<n>] [--driver=<driver>] [--edge-length=<n>] [--radius=<n>] [--no-data=<n>] [--window-size=<n>] [--dump-bounds=<filename>]
+    hunky-dory <file1> <file2> <outfile> [--capacity=<n>] [--sigma2=<n>] [--limit=<n>] [--driver=<driver>] [--edge-length=<n>] [--radius=<n>] [--no-data=<n>] [--window-size=<n>] [--dump-bounds=<filename>]
     hunky-dory (-h | --help)
 
 Options:
@@ -88,14 +87,7 @@ int main(int argc, char** argv) {
             continue;
         }
 
-        Eigen::MatrixXd result;
-        if (args.at("cpd").asBool()) {
-            if (args.at("rigid").asBool()) {
-                result = hunky_dory::cpd_rigid(data2, data1, sigma2);
-            } else if (args.at("nonrigid").asBool()) {
-                result = hunky_dory::cpd_nonrigid(data2, data1, sigma2);
-            }
-        }
+        Eigen::MatrixXd result = hunky_dory::cpd_rigid(data2, data1, sigma2);
         std::cout << (result - data1).colwise().mean() << std::endl;
         results.push_back(result - data1);
 
