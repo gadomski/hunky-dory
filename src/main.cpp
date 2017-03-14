@@ -1,8 +1,6 @@
 #include "Eigen/Dense"
 #include "bounds.hpp"
 #include "cpd.hpp"
-#include "cpd/logging.hpp"
-#include "cpd/vendor/spdlog/spdlog.h"
 #include "docopt.h"
 #include "pdal/EigenUtils.hpp"
 #include "pdal/PointTable.hpp"
@@ -38,7 +36,6 @@ Options:
 )";
 
 int main(int argc, char** argv) {
-    spdlog::stderr_logger_mt(cpd::LOGGER_NAME);
     std::map<std::string, docopt::value> args =
         docopt::docopt(USAGE, {argv + 1, argv + argc}, true, "");
     std::string filename1 = args.at("<file1>").asString();
